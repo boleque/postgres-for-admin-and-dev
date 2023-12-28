@@ -101,7 +101,7 @@ tmpfs            5.0M     0  5.0M   0% /run/lock
 tmpfs            385M  4.0K  385M   1% /run/user/1000
 /dev/nvme1n1     9.8G   24K  9.3G   1% /mnt/data
 ```
-8. перезагрузите инстанс и убедитесь, что диск остается примонтированным (если не так смотрим в сторону fstab)\
+8. перезагрузите инстанс и убедитесь, что диск остается примонтированным (если не так смотрим в сторону fstab)
 ```
 ubuntu@ip-172-31-25-37:~$ df -h
 Filesystem       Size  Used Avail Use% Mounted on
@@ -147,14 +147,14 @@ Dec 28 13:05:17 ip-172-31-25-37 systemd[1]: postgresql@15-main.service: Can't op
 Dec 28 13:05:17 ip-172-31-25-37 systemd[1]: postgresql@15-main.service: Failed with result 'protocol'.
 ░░ Subject: Unit failed
 ```
-13. задание: найти конфигурационный параметр в файлах раположенных в /etc/postgresql/15/main который надо поменять и поменяйте его\
+13. задание: найти конфигурационный параметр в файлах раположенных в /etc/postgresql/15/main который надо поменять и поменяйте его
 14. напишите что и почему поменяли
 ```
 Поменял аттрибут data_directory в конфигурационном файле /etc/postgresql/15/main/postgresql.conf
 старое значение: data_directory = '/var/lib/postgresql/15/main'
 новое значение: data_directory = '/mnt/data/15/main'
 ```
-15. попытайтесь запустить кластер - sudo -u postgres pg_ctlcluster 15 main start\
+15. попытайтесь запустить кластер - sudo -u postgres pg_ctlcluster 15 main start
 16. напишите получилось или нет и почему
 ```
 Кластер запустился
