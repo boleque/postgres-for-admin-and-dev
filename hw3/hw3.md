@@ -53,6 +53,9 @@ sudo systemctl stop postgresql@15-main
 7. добавьте свеже-созданный диск к виртуальной машине - надо зайти в режим ее редактирования и дальше выбрать пункт attach existing disk\
 ```
 Проинициализирован диск согласно инструкции https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-using-volumes.html
+```
+
+```
 -- получаем информацию обо всех устройствах
 root@ip-172-31-25-37:/# sudo lsblk -f
 NAME         FSTYPE FSVER LABEL           UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
@@ -139,6 +142,9 @@ See "systemctl status postgresql@15-main.service" and "journalctl -xeu postgresq
 12. напишите получилось или нет и почему
 ```
 Не удалось запустить кластер, т.к. отсутствует указанная в конфигурации data_directory
+```
+
+```
 ░░ A start job for unit postgresql@15-main.service has begun execution.
 ░░ 
 ░░ The job identifier is 891.
@@ -157,7 +163,10 @@ Dec 28 13:05:17 ip-172-31-25-37 systemd[1]: postgresql@15-main.service: Failed w
 15. попытайтесь запустить кластер - sudo -u postgres pg_ctlcluster 15 main start
 16. напишите получилось или нет и почему
 ```
-Кластер запустился
+Кластер запустился, data_directory указывает на верную директорию
+```
+
+```
 root@ip-172-31-25-37:/mnt# sudo systemctl start postgresql@15-main
 root@ip-172-31-25-37:/mnt# sudo systemctl status postgresql@15-main
 ● postgresql@15-main.service - PostgreSQL Cluster 15-main
@@ -182,7 +191,6 @@ Dec 28 13:23:39 ip-172-31-25-37 systemd[1]: Started PostgreSQL Cluster 15-main.
 
 17. зайдите через через psql и проверьте содержимое ранее созданной таблицы
 ```
-Данные на месте
 root@ip-172-31-25-37:/mnt# sudo -u postgres psql
 psql (15.5 (Ubuntu 15.5-1.pgdg22.04+1))
 Type "help" for help.
