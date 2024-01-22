@@ -148,7 +148,7 @@ otus=*# SELECT * FROM locks_v WHERE pid = 17180;
  17180 | transactionid | 744      | ShareLock        | f
 (3 rows)
 
--- после коммита транзакции 3 просыпаемся. Теперь держим блокировку отношения и собственного номера транзакции 745.
+-- после коммита транзакции 2 просыпаемся. Теперь держим блокировку отношения и собственного номера транзакции 745.
 
 otus=# SELECT * FROM locks_v WHERE pid = 17180;
   pid  |   locktype    |  lockid  |       mode       | granted 
@@ -239,6 +239,35 @@ Process 16772 waits for ShareLock on transaction 754; blocked by process 17180.
 HINT:  See server log for query details.
 CONTEXT:  while updating tuple (0,1) in relation "accounts"
 
+```
+
+```
+В логах видим - deadlock detected
+Детализация показывает:
+1. Process 17180 хочет ShareLock 752, которым владеет 16633
+2. Process 16633 хочет ShareLock 753, которым владеет 16772
+3. Process 16772 хочет ShareLock 754, которым владеет 17180
+```
+
+```
+2024-01-22 22:16:12.353 UTC [16772] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 3;
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus LOG:  process 17180 detected deadlock while waiting for ShareLock on transaction 752 after 200.180 ms
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus DETAIL:  Process holding the lock: 16633. Wait queue: .
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus CONTEXT:  while updating tuple (0,1) in relation "accounts"
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus ERROR:  deadlock detected
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus DETAIL:  Process 17180 waits for ShareLock on transaction 752; blocked by process 16633.
+        Process 16633 waits for ShareLock on transaction 753; blocked by process 16772.
+        Process 16772 waits for ShareLock on transaction 754; blocked by process 17180.
+        Process 17180: UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
+        Process 16633: UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 2;
+        Process 16772: UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 3;
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus HINT:  See server log for query details.
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus CONTEXT:  while updating tuple (0,1) in relation "accounts"
+2024-01-22 22:16:19.921 UTC [17180] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
+2024-01-22 22:16:19.921 UTC [16772] postgres@otus LOG:  process 16772 acquired ShareLock on transaction 754 after 7768.154 ms
+2024-01-22 22:16:19.921 UTC [16772] postgres@otus CONTEXT:  while updating tuple (0,3) in relation "accounts"
+2024-01-22 22:16:19.921 UTC [16772] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 3;
 ```
 
 5. Могут ли две транзакции, выполняющие единственную команду UPDATE одной и той же таблицы (без where), заблокировать друг друга?
