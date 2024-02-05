@@ -5,15 +5,15 @@
 ```
 otus=# ALTER SYSTEM SET log_lock_waits = on;
 ALTER SYSTEM
-otus=# ALTER SYSTEM SET deadlock_timeout TO 200;
+otus=# ALTER SYSTEM SET lock_timeout TO 200;
 ALTER SYSTEM
 otus=# SELECT pg_reload_conf();
  pg_reload_conf 
 ----------------
  t
 (1 row)
-otus=# SHOW deadlock_timeout;
- deadlock_timeout 
+otus=# SHOW lock_timeout;
+ lock_timeout 
 ------------------
  200ms
 (1 row)
@@ -46,11 +46,10 @@ COMMIT;
 
 ```
 -- Запись в журнале 
-2024-01-22 20:53:37.289 UTC [16772] postgres@otus LOG:  process 16772 still waiting for ShareLock on transaction 740 after 200.151 ms
-2024-01-22 20:53:37.289 UTC [16772] postgres@otus DETAIL:  Process holding the lock: 16633. Wait queue: 16772.
-2024-01-22 20:53:37.289 UTC [16772] postgres@otus CONTEXT:  while updating tuple (0,5) in relation "accounts"
-2024-01-22 20:53:37.289 UTC [16772] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
-2024-01-22 20:53:59.948 UTC [16772] postgres@otus LOG:  process 16772 acquired ShareLock on transaction 740 after 22858.691 ms
+ubuntu@ip-172-31-19-165:~$ sudo tail -n 20 /var/log/postgresql/postgresql-15-main.log
+2024-01-30 20:03:24.891 UTC [17835] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
+2024-01-30 20:04:36.811 UTC [17835] postgres@otus ERROR:  canceling statement due to lock timeout
+2024-01-30 20:04:36.811 UTC [17835] postgres@otus CONTEXT:  while updating tuple (0,1) in relation "accounts"
 ```
 
 2. Смоделируйте ситуацию обновления одной и той же строки тремя командами UPDATE в разных сеансах. 
