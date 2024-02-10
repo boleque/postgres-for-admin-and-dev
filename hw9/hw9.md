@@ -133,4 +133,5 @@ You are now connected to database "otus_another" as user "postgres".
 ```
 
 **Выводы:**
+Опробовано 2 утилиты для логического бэкапа - copy и pg_dump.
 Все данные были корректно восстановленны в таблицу employees_2
