@@ -1,43 +1,41 @@
-# Домашнее задание
+## Replication
 
-## Репликация
+### 1. Create tables on VM1 for writing (test) and reading (test2).
+Created EC2 instance on AWS - pg-replication-vm1 (172.31.33.195)
 
-
-### 1. На 1 ВМ создаем таблицы test для записи, test2 для запросов на чтение.
-Создан инстанс ec2 aws - pg-replication-vm1 (172.31.33.195)
 ```
--- создаем таблицы, test - на запись, test2 - на чтение
+-- Create tables, test - for writing, test2 - for reading
 postgres=# CREATE TABLE test as select generate_series(1, 100) as id, md5(random()::text) ::char(10) as fio;
 SELECT 100
 postgres=# CREATE TABLE test2 (id serial, fio varchar(10));
 CREATE TABLE
 ```
 
-### 2. Создаем публикацию таблицы test и подписываемся на публикацию таблицы test2 с ВМ №2.
+### 2. Create a publication for table test and subscribe to the publication of table test2 on VM2.
 ```
--- выставим wal_level на уровень logical 
+-- Set wal_level to logical 
 postgres=# ALTER SYSTEM SET wal_level = logical;
 ALTER SYSTEM
 
--- рестарт, чтобы применить изменения 
+-- Restart to apply changes  
 ubuntu@ip-172-31-33-195:~$ sudo systemctl restart postgresql@15-main
 
--- убеждаемся что изменения применены 
+-- Verify that the changes are applied 
 postgres=# show wal_level;
  wal_level 
 -----------
  logical 
 
--- создаем публикацию таблицы test
+-- Create publication for table test
 postgres=# CREATE PUBLICATION test_publication_vm1 FOR TABLE test;
 CREATE PUBLICATION
 
--- подписываемся на публикацию таблицы test2 vm2
+-- Subscribe to the publication of table test2 on VM2
 postgres=# CREATE SUBSCRIPTION test2_subscription_vm2 CONNECTION 'host=172.31.37.83 user=postgres dbname=postgres password=123' PUBLICATION test2_publication_vm2 WITH (copy_data = TRUE);
 NOTICE:  created replication slot "test2_subscription_vm2" on publisher
 CREATE SUBSCRIPTION
 
--- проверяем что данные в таблице test2 есть
+-- Check that data exists in table test2
 postgres=# select * from test2;
  id  |    fio     
 -----+------------
@@ -52,7 +50,7 @@ postgres=# select * from test2;
    9 | 2cde0937f6
   10 | 5d24b11cd6
 
--- статус подписки
+-- Subscription status
 postgres=# SELECT * FROM pg_stat_subscription\gx
 -[ RECORD 1 ]---------+------------------------------
 subid                 | 16417
@@ -67,41 +65,42 @@ latest_end_time       | 2024-02-14 20:38:06.730956+00
 
 ```
 
-### 3. На 2 ВМ создаем таблицы test2 для записи, test для запросов на чтение.
-Создан инстанс ec2 aws - pg-replication-vm2 (172.31.37.83)
+### 3. Create tables on VM2 for writing (test2) and reading (test).
+Created EC2 instance on AWS - pg-replication-vm2 (172.31.37.83)
+
 ```
--- создаем таблицы, test - на чтение, test2 - на запись
+-- Create tables, test - for reading, test2 - for writing
 postgres=# CREATE TABLE test2 as select generate_series(1, 100) as id, md5(random()::text)::char(10)  as fio; 
 SELECT 100
 postgres=# CREATE TABLE test (id serial, fio varchar(10));
 CREATE TABLE   
 ```
 
-### 4. Создаем публикацию таблицы test2 и подписываемся на публикацию таблицы test1 с ВМ №1.
+### 4. Create a publication for table test2 and subscribe to the publication of table test1 on VM1.
 ```
--- выставим wal_level на уровень logical 
+-- Set wal_level to logical 
 postgres=# ALTER SYSTEM SET wal_level = logical;
 ALTER SYSTEM
 
--- рестарт, чтобы применить изменения 
+-- Restart to apply changes 
 ubuntu@ip-172-31-37-83:~$ sudo systemctl restart postgresql@15-main
 
--- убеждаемся что изменения применены 
+-- Verify that the changes are applied 
 postgres=# show wal_level;
  wal_level 
 -----------
  logical 
 
--- создаем публикацию таблицы test2
+-- Create publication for table test2
 postgres=# CREATE PUBLICATION test2_publication_vm2 FOR TABLE test2;
 CREATE PUBLICATION
 
--- подписываемся на публикацию таблицы test2 vm1
+-- Subscribe to the publication of table test1 on VM1
 postgres=# CREATE SUBSCRIPTION test_subscription_vm1 CONNECTION 'host=172.31.33.195 user=postgres dbname=postgres password=123' PUBLICATION test_publication_vm1 WITH (copy_data = TRUE);
 NOTICE:  created replication slot "test_subscription_vm1" on publisher
 CREATE SUBSCRIPTION
 
--- проверяем что данные в таблице test есть
+-- Check that data exists in table test
 postgres=# select * from test;
  id  |    fio     
 -----+------------
@@ -116,7 +115,7 @@ postgres=# select * from test;
    9 | 2cde0937f6
   10 | 5d24b11cd6
 
--- статус подписки
+-- Subscription status
 postgres=# SELECT * FROM pg_stat_subscription\gx
 -[ RECORD 1 ]---------+------------------------------
 subid                 | 16399
@@ -129,16 +128,16 @@ last_msg_receipt_time | 2024-02-14 20:38:19.225997+00
 latest_end_lsn        | 0/1576D58
 latest_end_time       | 2024-02-14 20:38:19.225892+00
 ```
-### 5. 3 ВМ использовать как реплику для чтения и бэкапов (подписаться на таблицы из ВМ №1 и №2 ).
-Создан инстанс ec2 aws - pg-replication-vm3 (172.31.41.188)
+### Use VM3 as a read replica and for backups (subscribe to tables from VM1 and VM2).
+Created EC2 instance on AWS - pg-replication-vm3 (172.31.41.188)
 ```
--- создаем таблицы
+-- Create tables
 postgres=# CREATE TABLE test (id serial, fio varchar(10));
 CREATE TABLE
 postgres=# CREATE TABLE test2 (id serial, fio varchar(10));  
 CREATE TABLE
 
--- подписываемся на публикации таблицы test2 vm1, test1 vm2
+-- Subscribe to publications of table test2 on VM1, and test1 on VM2
 
 postgres=# CREATE SUBSCRIPTION test_subscription_vm1 CONNECTION 'host=172.31.37.83 user=postgres dbname=postgres password=123' PUBLICATION test2_publication_vm2 WITH (copy_data = TRUE);
 NOTICE:  created replication slot "test_subscription_vm1" on publisher
@@ -148,7 +147,7 @@ postgres=# CREATE SUBSCRIPTION test_subscription_vm2 CONNECTION 'host=172.31.33.
 NOTICE:  created replication slot "test_subscription_vm2" on publisher
 CREATE SUBSCRIPTION
 
--- убеждаемся что данные на месте
+-- Verify that data is present
 postgres=# select * from test;
  id  |    fio     
 -----+------------
@@ -201,10 +200,8 @@ latest_end_lsn        | 0/1576D58
 latest_end_time       | 2024-02-14 20:39:19.293625+00
 
 ```
-### 6. Дополнительные подготовительные действия
-Для обеспечения коммуникации между кластерами, был установлен пароль для vm1, vm2  
-Сервер PG на vm1, vm2 слушает все адреса listen_addresses='*'  
-Отдельно прописаны ip адреса для каждой машины (pg_hba.conf), к которой будет подключение в рамках подписки:
+### 6. Additional Preparatory Steps
+To ensure communication between clusters, passwords were set for vm1 and vm2. The PostgreSQL server on vm1 and vm2 listens on all addresses (listen_addresses='*'). Separate IP addresses were configured for each machine in pg_hba.conf to enable connections within the subscriptions:
 ```
 -- pg-replication-vm1
 ubuntu@ip-172-31-33-195:~$ sudo nano /etc/postgresql/15/main/pg_hba.conf

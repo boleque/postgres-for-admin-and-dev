@@ -1,15 +1,12 @@
-# Домашнее задание
+## Table Sectioning
 
-## Секционирование таблицы
-
-
-### 1. Секционирование по хешу
+### 1. Hash
 
 ```
--- создадим отдельную схему
+-- Create a separate schema
 CREATE SCHEMA IF NOT EXISTS by_hash;
 
--- создадим таблицу
+-- Create the table
 CREATE TABLE by_hash.flights_child (
 	flight_id serial4 NOT NULL,
 	flight_no bpchar(6) NOT NULL,
@@ -23,19 +20,19 @@ CREATE TABLE by_hash.flights_child (
 	actual_arrival timestamptz NULL
 ) PARTITION BY hash (flight_id);
 
--- создадим таблицы-партиции, в количестве 5 шт
+-- Create partition tables, 5 in total
 CREATE TABLE by_hash.flights_child_0 partition of by_hash.flights_child for values with (modulus 5, remainder 0);
 CREATE TABLE by_hash.flights_child_1 partition of by_hash.flights_child for values with (modulus 5, remainder 1);
 CREATE TABLE by_hash.flights_child_2 partition of by_hash.flights_child for values with (modulus 5, remainder 2);
 CREATE TABLE by_hash.flights_child_3 partition of by_hash.flights_child for values with (modulus 5, remainder 3);
 CREATE TABLE by_hash.flights_child_4 partition of by_hash.flights_child for values with (modulus 5, remainder 4);
 
--- наполняем дочернюю таблицу
+-- Populate the child table
 INSERT INTO by_hash.flights_child
 SELECT * FROM bookings.flights;
 
--- проанализируем планы запросов
--- 1. запрос к родительской таблице
+-- Analyze query plans
+-- 1. Query on the parent table
 demo=# explain select * from bookings.flights where flight_id = 100;
                                  QUERY PLAN                                  
 -----------------------------------------------------------------------------
@@ -43,7 +40,7 @@ demo=# explain select * from bookings.flights where flight_id = 100;
    Index Cond: (flight_id = 100)
 (2 rows)
 
--- 2. запрос к дочерней таблице - планировщик распредил нас на партицию #4, т.е. таблицу flights_child_4, все верно
+-- 2. Query on the child table - planner directs us to partition #4, i.e., table flights_child_4, everything is correct
 demo=# explain select * from by_hash.flights_child where flight_id = 100;
                                    QUERY PLAN                                    
 ---------------------------------------------------------------------------------
@@ -53,13 +50,13 @@ demo=# explain select * from by_hash.flights_child where flight_id = 100;
 
 ```
 
-### 1. Секционирование по списку
+### 1. List
 
 ```
--- создадим отдельную схему
+-- Create a separate schema
 CREATE SCHEMA IF NOT EXISTS by_list;
 
--- создадим таблицу
+-- Create the table
 CREATE TABLE by_list.flights_child (
 	flight_id serial4 NOT NULL,
 	flight_no bpchar(6) NOT NULL,
@@ -73,7 +70,7 @@ CREATE TABLE by_list.flights_child (
 	actual_arrival timestamptz NULL
 ) PARTITION BY list (departure_airport);
 
--- создадим таблицы-партиции, в количестве 3 шт - аэропорты отправления из Мск, Спб и другие
+-- Create partition tables, 3 in total - departure airports from Moscow, St. Petersburg, and others
 CREATE TABLE by_list.departure_airport_msk PARTITION OF by_list.flights_child
     FOR VALUES IN ('VKO', 'SVO');
 
@@ -82,12 +79,12 @@ CREATE TABLE by_list.departure_airport_spb PARTITION OF by_list.flights_child
 
 CREATE TABLE by_list.departure_airport_others PARTITION OF by_list.flights_child DEFAULT;
 
--- наполняем дочернюю таблицу
+-- Populate the child table
 INSERT INTO by_list.flights_child
 SELECT * FROM bookings.flights;
 
--- проанализируем планы запросов
--- 1. запрос по departure_airport = VKO перенаправляет на требуемую партицию
+-- Analyze query plans
+-- 1. Query for departure_airport = VKO directs us to the correct partition
 demo=# EXPLAIN SELECT * FROM by_list.flights_child WHERE departure_airport = 'VKO';
                                         QUERY PLAN                                        
 ------------------------------------------------------------------------------------------
@@ -95,7 +92,7 @@ demo=# EXPLAIN SELECT * FROM by_list.flights_child WHERE departure_airport = 'VK
    Filter: (departure_airport = 'VKO'::bpchar)
 (2 rows)
 
--- 2. запрос по departure_airport = KZN перенаправляет на дефолтную партицию, ожидаемо вырастает стоимость запроса
+-- 2. Query for departure_airport = KZN directs us to the default partition, as expected the query cost increases
 demo=# EXPLAIN SELECT * FROM by_list.flights_child WHERE departure_airport = 'KZN';
                                          QUERY PLAN                                          
 ---------------------------------------------------------------------------------------------

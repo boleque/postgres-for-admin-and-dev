@@ -1,1 +1,1 @@
-postgres-otus-2023
+Postgres for Administrators and Developers, Collection of Webinar Notes and Personal Challenges

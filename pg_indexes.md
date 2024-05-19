@@ -1,9 +1,7 @@
-# Домашнее задание
-
-## Работа с индексами
+## Working with Indexes
 
 
-### Подготовительные работы
+### Preliminary Work
 ```
 otus=# CREATE TABLE employees (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -41,7 +39,7 @@ CROSS JOIN(
 ) AS arrays) as tmp;
 INSERT 0 100000
 
--- статистика по таблице 
+-- statistics for the table
 
 otus=# SELECT attname, correlation FROM pg_stats WHERE tablename = 'employees';
    attname    |  correlation  
@@ -56,10 +54,10 @@ otus=# SELECT attname, correlation FROM pg_stats WHERE tablename = 'employees';
 
 ```
 
-### 1. Создать индекс к какой-либо из таблиц вашей БД. Прислать текстом результат команды explain, в которой используется данный индекс
+### 1. Create an Index on a Table in Your Database. Provide the Result of the explain Command Using This Index.
 
 ```
--- стоимость запроса по неиндексированному столбцу 2405.85, используется Seq Scan
+-- the cost of the query on the non-indexed column is 2405.85, Seq Scan is used
 EXPLAIN SELECT * FROM employees WHERE employee_num = '8b4ffc25-17c2-3640-6e04-640dc7954615';
 
 otus=# EXPLAIN SELECT * FROM employees WHERE employee_num = '8b4ffc25-17c2-3640-6e04-640dc7954615';
@@ -83,10 +81,10 @@ otus=# EXPLAIN SELECT * FROM employees WHERE employee_num = '8b4ffc25-17c2-3640-
 
 ```
 
-### 2. Реализовать индекс для полнотекстового поиска
+### 2. Implement a Full-Text Search Index
 
 ```
--- реализуем запрос на поиск сотрудников с именем Bill, стоимость запроса составила 4772.00
+-- Implement a query to search for employees with the name Bill, the cost of the query was 4772.00
 otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE first_name LIKE 'Bill%';
                            QUERY PLAN                           
 ----------------------------------------------------------------
@@ -95,22 +93,22 @@ otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE first_na
 (2 rows)
 
 
--- добавим новый столбец к таблице employees, который будет содержать нормализованную форму почтового адреса
+-- Add a new column to the employees table, which will contain the normalized form of the email address
 
 otus=# ALTER TABLE employees ADD COLUMN email_vector tsvector;
 ALTER TABLE
 
--- заполняем столбец 
+-- Populate the column 
 otus=# UPDATE employees SET email_vector = to_tsvector('english', email);
 UPDATE 100000
 
 
--- создаем GIN индекс для столбца email_vector
+-- Create a GIN index for the email_vector column
 
 otus=# CREATE INDEX idx_emails_vector ON employees USING gin(email_vector);
 CREATE INDEX
 
--- анализируем запрос, стоимость запроса составила 3187.81
+-- Analyze the query, the cost of the query was 3187.81
 otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE email_vector @@ to_tsquery('english', 'bill:*');
                                      QUERY PLAN                                     
 ------------------------------------------------------------------------------------
@@ -121,20 +119,20 @@ otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE email_ve
 (4 rows)
 ```
 
-### 3. Реализовать индекс на часть таблицы или индекс на поле с функцией
+### 3. Implement an Index on Part of a Table or a Functional Index
 ```
--- реализуем запрос на поиск имени, которое начинается с a в lower case, проанализируем и получим стоимость 5272.00
+-- Implement a query to search for names starting with 'a' in lower case, analyze and get the cost of 5272.00
 otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE lower(substr(first_name, 1, 1)) = 'a';
                           QUERY PLAN                           
 ---------------------------------------------------------------
  Seq Scan on employees  (cost=0.00..5272.00 rows=500 width=42)
    Filter: (lower(substr(first_name, 1, 1)) = 'a'::text)
 (2 rows)
--- построим функциональный индекс
+-- Create a functional index
 otus=# CREATE INDEX idx_first_name_first_letter_lower ON employees ((lower(substr(first_name, 1, 1))));
 CREATE INDEX
 
--- проанализируем запрос, стоимость запрос составила 1374.76
+-- Analyze the query, the cost of the query was 1374.76
 otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE lower(substr(first_name, 1, 1)) = 'a';
                                             QUERY PLAN                                            
 --------------------------------------------------------------------------------------------------
@@ -145,10 +143,10 @@ otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE lower(su
 (4 rows)
 
 ```
-### 4. Создать индекс на несколько полей
+### 4. Create an Index on Multiple Fields
 
 ```
--- реализуем запрос для поиска сотрудников с именем Bill и фамилией Smith, проанализируем, стоимость составляет 5022.00
+-- Implement a query to search for employees with the name Bill and the last name Smith, analyze the cost, which is 5022.00
 otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE first_name = 'Bill' AND last_name = 'Smith';
                                QUERY PLAN                                
 -------------------------------------------------------------------------
@@ -156,12 +154,12 @@ otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE first_na
    Filter: ((first_name = 'Bill'::text) AND (last_name = 'Smith'::text))
 (2 rows)
 
--- проиндексируем 2 стобца: first_name, last_name
+-- Create an index on 2 columns: first_name, last_name
 
 otus=# CREATE INDEX idx_first_last_name ON employees(first_name, last_name);
 CREATE INDEX
 
--- проанализируем исходный запрос, стоимость 256.45
+-- Analyze the original query, the cost is 256.45
 
 otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE first_name = 'Bill' AND last_name = 'Smith';
                                     QUERY PLAN                                     
@@ -173,7 +171,7 @@ otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE first_na
 (4 rows)
 
 
--- стоимость запроса только по столбцу last_name составляет 4772.00
+-- The cost of a query only by the last_name column is 4772.00
 
 otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE last_name = 'Smith';
                            QUERY PLAN                           
@@ -183,8 +181,8 @@ otus=# EXPLAIN SELECT first_name, last_name, email FROM employees WHERE last_nam
 (2 rows)
 
 ```
-**Выводы:**
-- индекс по неравномерному (3.3436172e-05) полю employee_num уменьшил стоимость запроса с 2405.85 до 8.44;
-- использования индекса GIN для поиска по почте уменьшил стоимость c 4772.00 до 3187.81, т.е. на ~34%;
-- функциональный индекс для запроса по первой букве имени в lower case уменьшил стоимость запроса с 5272.00 до 1374.76;
-- составной индекс по имени и фамилии уменьшил стоимость запроса с 5022.00 до 256.45. Стоит отметить, что запрос только по фамилии приводит к последовательному скану со стоимостью 4772.00. В литературе встречал упоминание, что использование фильтрация не в том порядке, который объявлен при создании индекса так же не приводит к снижению стоимости запроса, однако подтвердить это не удалось, так же используется Bitmap Heap Scan со стоимость 256.45.
+**Conclusions:**
+- The index on the low cardinality field employee_num (correlation 3.3436172e-05) reduced the query cost from 2405.85 to 8.44.
+- Using a GIN index for searching by email reduced the cost from 4772.00 to 3187.81, which is approximately a 34% reduction.
+- The functional index for searching by the first letter of the name in lower case reduced the query cost from 5272.00 to 1374.76.
+- The composite index on first_name and last_name reduced the query cost from 5022.00 to 256.45. It's worth noting that querying only by last_name leads to a sequential scan with a cost of 4772.00. There's a mention in literature that using filtering not in the order defined in the index creation statement also doesn't reduce the query cost, but this couldn't be confirmed. Additionally, a Bitmap Heap Scan is used with a cost of 256.45.

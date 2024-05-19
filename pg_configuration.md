@@ -1,39 +1,38 @@
-# Домашнее задание
-## Установка и настройка PostgreSQL
+## Installing and Configuring PostgreSQL
 
-1. создайте виртуальную машину c Ubuntu 20.04/22.04 LTS в GCE/ЯО/Virtual Box/докере
+1. Create a virtual machine with Ubuntu 20.04/22.04 LTS on GCE/Oracle Cloud/Virtual Box/Docker  
 ```
-Создан ec2 инстанс в aws
+Created an EC2 instance on AWS
 ```
-2. поставьте на нее PostgreSQL 15 через sudo apt
+2. Install PostgreSQL 15 using sudo apt  
 ```
 sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt -y install postgresql-15
 ```
-3. проверьте что кластер запущен через sudo -u postgres pg_lsclusters
+3. Check that the cluster is running using sudo -u postgres pg_lsclusters  
 ```
 ubuntu@ip-172-31-25-37:~$ sudo -u postgres pg_lsclusters
 Ver Cluster Port Status Owner    Data directory              Log file
 15  main    5432 online postgres /var/lib/postgresql/15/main /var/log/postgresql/postgresql-15-main.log
 ```
-4. зайдите из под пользователя postgres в psql и сделайте произвольную таблицу с произвольным содержимым
+4. Log in as the postgres user in psql and create an arbitrary table with arbitrary content  
 
 ```
 sudo -u postgres psql
 ```
 
 ```
--- cоздаем новую БД
+-- Create a new database
 CREATE DATABASE otus;
 
---- Подключаемся
+--- Connect to it
 \c otus
 
--- Создаем и наполняем таблицу persons
+-- Create and populate the persons table
 create table persons(id serial, first_name text, second_name text); 
 insert into persons(first_name, second_name) values('ivan', 'ivanov'); 
 insert into persons(first_name, second_name) values('petr', 'petrov');
 
--- Проверяем что данные на месте:
+-- Check that the data is in place:
 otus=# select * from persons;
  id | first_name | second_name 
 ----+------------+-------------
@@ -42,21 +41,21 @@ otus=# select * from persons;
 (2 rows)
 ```
 
-5. остановите postgres например через sudo -u postgres pg_ctlcluster 15 main stop\
+5. Stop PostgreSQL, for example using sudo -u postgres pg_ctlcluster 15 main stop
 ```
 sudo systemctl stop postgresql@15-main
 ```
-6. создайте новый диск к ВМ размером 10GB\
+6. Create a new 10GB disk for the VM
 ```
 Создан aws volume размером 10GB
 ```
-7. добавьте свеже-созданный диск к виртуальной машине - надо зайти в режим ее редактирования и дальше выбрать пункт attach existing disk\
+7. Attach the newly created disk to the virtual machine - go into edit mode and choose attach existing disk
 ```
-Проинициализирован диск согласно инструкции https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-using-volumes.html
+Initialized the disk according to the instructions at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-using-volumes.html
 ```
 
 ```
--- получаем информацию обо всех устройствах
+-- Get information about all devices
 root@ip-172-31-25-37:/# sudo lsblk -f
 NAME         FSTYPE FSVER LABEL           UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
 loop0                                                                                0   100% /snap/amazon-ssm-agent/7628
@@ -70,7 +69,7 @@ nvme0n1
 ├─nvme0n1p14                                                                                  
 └─nvme0n1p15 vfat   FAT32 UEFI            A62D-E731                              98.3M     6% /boot/efi
 
--- проверяем что файловая система отсутствует на устройстве nvme1n1
+-- Check that there is no filesystem on device nvme1n1
 root@ip-172-31-25-37:/# sudo file -s /dev/nvme1n1
 /dev/nvme1n1: data
 
@@ -85,15 +84,15 @@ Allocating group tables: done
 Writing inode tables: done                            
 Creating journal (16384 blocks): done
 Writing superblocks and filesystem accounting information: done 
--- проверяем что файловая система создана 
+-- Check that the filesystem is created 
 root@ip-172-31-25-37:/# sudo file -s /dev/nvme1n1
 /dev/nvme1n1: Linux rev 1.0 ext4 filesystem data, UUID=8f46d9ab-13f4-4936-b292-50185391f10c (extents) (64bit) (large files) (huge files)
 
--- создаем директорию mnt/data и монтируем туда устройство 
+-- Create directory mnt/data and mount the device there 
 root@ip-172-31-25-37:/# mkdir mnt/data
 root@ip-172-31-25-37:/# mount /dev/nvme1n1 /mnt/data
 
--- проверяем результат
+-- Check the result
 root@ip-172-31-25-37:/# df -h
 Filesystem       Size  Used Avail Use% Mounted on
 /dev/root        7.6G  2.0G  5.6G  27% /
@@ -104,7 +103,7 @@ tmpfs            5.0M     0  5.0M   0% /run/lock
 tmpfs            385M  4.0K  385M   1% /run/user/1000
 /dev/nvme1n1     9.8G   24K  9.3G   1% /mnt/data
 ```
-8. перезагрузите инстанс и убедитесь, что диск остается примонтированным (если не так смотрим в сторону fstab)
+8. Reboot the instance and ensure that the disk remains mounted (if not, look at fstab)
 ```
 ubuntu@ip-172-31-25-37:~$ df -h
 Filesystem       Size  Used Avail Use% Mounted on
@@ -115,7 +114,7 @@ tmpfs            5.0M     0  5.0M   0% /run/lock
 /dev/nvme1n1p15  105M  6.1M   99M   6% /boot/efi
 tmpfs            385M  4.0K  385M   1% /run/user/1000
 ```
-9. сделайте пользователя postgres владельцем /mnt/data - chown -R postgres:postgres /mnt/data/
+9. Make the postgres user the owner of /mnt/data - chown -R postgres
 ```
 /dev/sdf/data - chown -R postgres:postgres /dev/sdf/data
 ubuntu@ip-172-31-25-37:/mnt$ ll
@@ -124,7 +123,7 @@ drwxr-xr-x  3 root     root     4096 Dec 28 12:47 ./
 drwxr-xr-x 19 root     root     4096 Dec 28 12:51 ../
 drwxr-xr-x  2 postgres postgres 4096 Dec 28 12:47 data/
 ```
-10. перенесите содержимое /var/lib/postgres/15 в /mnt/data - mv /var/lib/postgresql/15/mnt/data
+10. Move the contents of /var/lib/postgres/15 to /mnt/data - mv /var/lib/postgresql/15/mnt/data
 ```
 ubuntu@ip-172-31-25-37:/mnt$ sudo mv /var/lib/postgresql/15 /mnt/data
 ubuntu@ip-172-31-25-37:/mnt$ ll /mnt/data/
@@ -133,15 +132,15 @@ drwxr-xr-x 3 postgres postgres 4096 Dec 28 12:59 ./
 drwxr-xr-x 3 root     root     4096 Dec 28 12:47 ../
 drwxr-xr-x 3 postgres postgres 4096 Dec 28 09:36 15/
 ```
-11. попытайтесь запустить кластер - sudo -u postgres pg_ctlcluster 15 main start
+11. Attempt to start the cluster - sudo -u postgres pg_ctlcluster 15 main start
 ```
 ubuntu@ip-172-31-25-37:/mnt$ sudo systemctl start postgresql@15-main
 Job for postgresql@15-main.service failed because the service did not take the steps required by its unit configuration.
 See "systemctl status postgresql@15-main.service" and "journalctl -xeu postgresql@15-main.service" for details.
 ```
-12. напишите получилось или нет и почему
+12. Write whether it worked or not and why
 ```
-Не удалось запустить кластер, т.к. отсутствует указанная в конфигурации data_directory
+Failed to start the cluster because the specified data_directory in the configuration does not exist
 ```
 
 ```
@@ -153,17 +152,17 @@ Dec 28 13:05:17 ip-172-31-25-37 systemd[1]: postgresql@15-main.service: Can't op
 Dec 28 13:05:17 ip-172-31-25-37 systemd[1]: postgresql@15-main.service: Failed with result 'protocol'.
 ░░ Subject: Unit failed
 ```
-13. задание: найти конфигурационный параметр в файлах раположенных в /etc/postgresql/15/main который надо поменять и поменяйте его
-14. напишите что и почему поменяли
+13. find the configuration parameter in the files located in /etc/postgresql/15/main that needs to be changed and change it
+14. write what was changed and why
 ```
-Поменял аттрибут data_directory в конфигурационном файле /etc/postgresql/15/main/postgresql.conf
-старое значение: data_directory = '/var/lib/postgresql/15/main'
-новое значение: data_directory = '/mnt/data/15/main'
+Changed the data_directory attribute in the configuration file /etc/postgresql/15/main/postgresql.conf
+old value: data_directory = '/var/lib/postgresql/15/main'
+new value: data_directory = '/mnt/data/15/main'
 ```
-15. попытайтесь запустить кластер - sudo -u postgres pg_ctlcluster 15 main start
-16. напишите получилось или нет и почему
+15. try to start the cluster - sudo -u postgres pg_ctlcluster 15 main start
+16. write whether it worked or not and why
 ```
-Кластер запустился, data_directory указывает на верную директорию
+The cluster has started, data_directory points to the correct directory
 ```
 
 ```
@@ -189,7 +188,7 @@ Dec 28 13:23:37 ip-172-31-25-37 systemd[1]: Starting PostgreSQL Cluster 15-main.
 Dec 28 13:23:39 ip-172-31-25-37 systemd[1]: Started PostgreSQL Cluster 15-main.
 ```
 
-17. зайдите через через psql и проверьте содержимое ранее созданной таблицы
+17. check the contents of the previously created table
 ```
 root@ip-172-31-25-37:/mnt# sudo -u postgres psql
 psql (15.5 (Ubuntu 15.5-1.pgdg22.04+1))

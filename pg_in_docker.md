@@ -1,29 +1,28 @@
-# Домашнее задание
-## Установка и настройка PostgteSQL в контейнере Docker
+## Installing and Configuring PostgreSQL in a Docker Container
 
-Запустил контейнер с БД в EC2 инстансе aws
+Launched a database container on an AWS EC2 instance:  
 ```
 sudo docker run --name pg-server --network pg-net -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v /var/lib/postgres:/var/lib/postgresql/data postgres:15
 ```
-Запустил отдельный контейнер с клиентом и подключился к  pg-server
+Launched a separate client container and connected to pg-server:  
 ```
 sudo docker run -it --rm --network pg-net --name pg-client postgres:14 psql -h pg-server -U postgres
 ```
-Работа с базой данных из клиента **pg-client**
+Working with the database from the **pg-client**:  
 ```sql
--- создаем новую БД
+-- Create a new database
 CREATE DATABASE otus;
 
--- подключаемся
+-- Connect to it
 \c otus
 
--- создаем и наполняем таблицу persons
+-- Create and populate the persons table
 create table persons(id serial, first_name text, second_name text); 
 insert into persons(first_name, second_name) values('ivan', 'ivanov'); 
 insert into persons(first_name, second_name) values('petr', 'petrov'); 
 
 ```
-Проверяем что данные на месте:
+Checked that the data is in place:  
 ```sql
 otus=# select * from persons;
  id | first_name | second_name 
@@ -33,25 +32,25 @@ otus=# select * from persons;
 (2 rows)
 
 ```
-Удалил контейнер с сервером
+Deleted the server container:  
 ```
 sudo docker rm -f pg-server
 ```
-Запустил контейнер заново 
+Restarted the container:  
 ```
 sudo docker run --name pg-server --network pg-net -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v /var/lib/postgres:/var/lib/postgresql/data postgres:15
 ```
-Попробовал подключиться к БД с рабочей машины
+Tried to connect to the database from the local machine:  
 ```
 psql -p 5432 -U postgres -h ec2-13-49-66-130.eu-north-1.compue.amazonaws.com -d postgres -W
 Password: 
 psql: error: connection to server at "ec2-13-49-66-130.eu-north-1.compute.amazonaws.com" (13.49.66.130), port 5432 failed: fe_sendauth: no password supplied
 ```
-Решил проблему с подключением следующим образом:
-- разрешил inbound траффик на порт 5432 для security group aws
-- в pg_hba.conf IPv4 local connections заменен с  127.0.0.1/32 на 0.0.0.0/0
+Resolved the connection issue by:  
+- Allowing inbound traffic on port 5432 for the AWS security group
+- Modifying the IPv4 local connections in pg_hba.conf from 127.0.0.1/32 to 0.0.0.0/0
 
-Подключение к БД с рабочей машины прошло, далее убедидся что данные в БД остались, несмотря на удаление контейнера:
+Successfully connected to the database from the local machine and confirmed that the data remained intact despite deleting the container:  
 ```sql
 otus=# select * from persons;
  id | first_name | second_name 

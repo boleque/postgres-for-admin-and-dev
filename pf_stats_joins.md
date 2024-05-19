@@ -1,9 +1,6 @@
-# Домашнее задание
+## Joins, stats
 
-## Работа с join'ами, статистикой
-
-
-### Подготовительные работы
+### Preparatory work
 ![schema](https://ucarecdn.com/e4669333-8898-434f-b1a5-4fa88b39ae02/)
 
 ```
@@ -148,9 +145,9 @@ VALUES
 
 ```
 
-### 1. Реализовать прямое соединение двух или более таблиц
+### 1. Implement a direct join between two or more tables
 ```
--- вывод студентов, которые сдавали дисциплину «Основы баз данных» 
+-- students who took the “Database Fundamentals” course
 SELECT name_student, date_attempt, result
 FROM 
     otus.student
@@ -176,9 +173,9 @@ ORDER BY result desc;
 
 ```
 
-### 2. Реализовать левостороннее (или правостороннее) соединение двух или более таблиц
+### 2. Implement a left (or right) join on two or more tables
 ```
--- вывод, сколько попыток сделали студенты по каждой дисциплине
+-- how many attempts students made in each discipline
 SELECT name_subject, count(attempt_id) as Количество, round(avg(result), 2) as Среднее
 FROM
     otus.subject
@@ -201,7 +198,7 @@ ORDER BY Среднее desc;
 (9 rows)
 ```
 
-### 3. Реализовать кросс соединение двух или более таблиц
+### 3. Implement a cross join of two or more tables
 ```
 SELECT  name_student, attempt_id, subject_id, date_attempt, result
 FROM otus.student 
@@ -217,7 +214,7 @@ CROSS JOIN otus.attempt;
 (4 rows)
 
 ```
-### 4. Реализовать полное соединение двух или более таблиц
+### 4. Implement a full join of two or more tables
 ```
 SELECT name_subject
 FROM
@@ -236,7 +233,7 @@ WHERE attempt_id is null;
          ->  Seq Scan on subject  (cost=0.00..22.00 rows=1200 width=40)
 (6 rows)
 ```
-### 5. Реализовать запрос, в котором будут использованы разные типы соединений
+### 5. Implement a query that will use different connection types
 ```
 SELECT name_student, name_subject, date_attempt
 FROM otus.subject INNER JOIN otus.attempt USING (subject_id)
@@ -260,10 +257,10 @@ ORDER BY name_student, date_attempt;
 (11 rows)
 ```
 
-**Выводы:**
-- в работе были апробованы различные типа соединений: inner, outer (left, right), full и cross
-- простое прямое соединение (без условий) использует Nested Loop. 
-- в left join (с группировкой и сортировкой) оптимизатор использует Hash Join
-- самый тяжелый запрос на cross соединение применяет Nested Loop, тут оптимизировать нечего
-- full join оптимизатор предпочитает выполнить с использованием Hash Join
-- в запросе с использованием различных видов соединений оптимизатор избежает Nested Loop и использует Hash Join во всех случаях
+**Conclusions:**
+- Various types of joins were explored: inner, outer (left, right), full, and cross.
+- Simple inner joins (without conditions) use Nested Loop.
+- Left join (with grouping and sorting) optimizer uses Hash Join.
+- The most complex query, involving cross joins, utilizes Nested Loop, which cannot be optimized further.
+- Full join optimizer prefers executing with Hash Join.
+- In the query involving different types of joins, the optimizer avoids Nested Loop and uses Hash Join in all cases.

@@ -1,15 +1,13 @@
-# Домашнее задание
-
-## Триггеры, поддержка заполнения витрин
+## Triggers, Support for Data Mart
 
 
-### Подготовительные работы
+### Preparatory Work
 
 ``` sql
 DROP SCHEMA IF EXISTS pract_functions CASCADE;
 CREATE SCHEMA pract_functions;
 
-SET search_path = pract_functions, publ
+SET search_path = pract_functions, public;
 
 DROP TABLE IF EXISTS goods CASCADE;
 CREATE TABLE goods
@@ -19,8 +17,8 @@ CREATE TABLE goods
     good_price  numeric(12, 2) NOT NULL CHECK (good_price > 0.0)
 );
 INSERT INTO goods (good_id, good_name, good_price)
-VALUES 	(1, 'Спички хозайственные', .50),
-		(2, 'Автомобиль Ferrari FXX K', 185000000.01);
+VALUES 	(1, 'Matches', 0.50),
+		(2, 'Ferrari FXX K', 185000000.01);
 
 DROP TABLE IF EXISTS sales CASCADE;
 CREATE TABLE sales
@@ -32,16 +30,17 @@ CREATE TABLE sales
 );
 INSERT INTO sales (good_id, sales_qty) VALUES (1, 10), (1, 1), (1, 120), (2, 1);
 
--- таблица витрина
+-- Data Mart table
 DROP TABLE IF EXISTS good_sum_mart;
 CREATE TABLE good_sum_mart
 (
 	good_name   varchar(63) NOT NULL,
-	sum_sale	numeric(16, 2)NOT NULL
+	sum_sale	numeric(16, 2) NOT NULL
 );
+
 ```
 
-### Триггер для поддержки витрины
+### Trigger for Data Mart Maintenance
 
 ``` sql
 CREATE OR REPLACE FUNCTION tf_maintain_showcase()
@@ -102,7 +101,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- создаем триггер
+-- Create the trigger
 CREATE TRIGGER trg_after_r
 AFTER INSERT OR UPDATE OR DELETE
 ON sales
@@ -110,25 +109,26 @@ FOR EACH ROW
 EXECUTE FUNCTION tf_maintain_showcase();
 ```
 
-### Тесты
+### Tests
 
 ``` sql
--- Вставка нового значения
+-- Insert a new value
 INSERT INTO sales (good_id, sales_qty) VALUES (1, 1); -- sales_id=7
 Name     |Value               |
 ---------+--------------------+
-good_name|Спички хозайственные|
+good_name|Matches             |
 sum_sale |0.50                |
 
--- Обновляем количество купленных товаров на +1
+-- Update the quantity of purchased items by +1
 UPDATE sales SET sales_qty = 2 WHERE sales_id = 7;
 good_name           |sum_sale|
 --------------------+--------+
-Спички хозайственные|    1.00|
+Matches             |    1.00|
 
--- Удаляем запись
+-- Delete the record
 DELETE FROM sales WHERE sales_id = 7;
 good_name           |sum_sale|
 --------------------+--------+
-Спички хозайственные|    0.00|
+Matches             |    0.00|
+
 ```

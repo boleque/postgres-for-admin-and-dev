@@ -1,7 +1,6 @@
-# Домашнее задание
-## Механизм блокировок
+## Lock Mechanism
 
-1. Настройте сервер так, чтобы в журнал сообщений сбрасывалась информация о блокировках, удерживаемых более 200 миллисекунд. 
+1. Configure the server so that information about locks held for more than 200 milliseconds is written to the message log.  
 ```
 otus=# ALTER SYSTEM SET log_lock_waits = on;
 ALTER SYSTEM
@@ -19,10 +18,10 @@ otus=# SHOW lock_timeout;
 (1 row)
 ```
 
-2. Воспроизведите ситуацию, при которой в журнале появятся такие сообщения.
+2. Reproduce a situation where such messages appear in the log.  
 
 ```
--- создадим тестовую таблицу
+-- create a test table
 otus=# CREATE TABLE accounts( acc_no integer PRIMARY KEY, amount numeric ); 
 INSERT INTO accounts VALUES (1,1000.00), (2,2000.00), (3,3000.00);
 CREATE TABLE
@@ -45,17 +44,17 @@ COMMIT;
 ```
 
 ```
--- Запись в журнале 
+-- Log entry
 ubuntu@ip-172-31-19-165:~$ sudo tail -n 20 /var/log/postgresql/postgresql-15-main.log
 2024-01-30 20:03:24.891 UTC [17835] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
 2024-01-30 20:04:36.811 UTC [17835] postgres@otus ERROR:  canceling statement due to lock timeout
 2024-01-30 20:04:36.811 UTC [17835] postgres@otus CONTEXT:  while updating tuple (0,1) in relation "accounts"
 ```
 
-2. Смоделируйте ситуацию обновления одной и той же строки тремя командами UPDATE в разных сеансах. 
+3. Simulate the scenario of updating the same row with three UPDATE commands in different sessions.  
 
 ```
--- создадим представление pg_locks
+-- create the pg_locks view
 otus=# CREATE VIEW locks_v AS SELECT pid, locktype, CASE locktype WHEN 'relation' THEN relation::regclass::text WHEN 'transactionid' THEN transactionid::text WHEN 'tuple' THEN relation::regclass::text||':'||tuple::text END AS lockid, mode, granted FROM pg_locks WHERE locktype in ('relation','transactionid','tuple') AND (locktype != 'relation' OR relation = 'accounts'::regclass);
 CREATE VIEW
 ```
@@ -72,7 +71,7 @@ otus=*# SELECT txid_current(), pg_backend_pid();
 
 otus=*# UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
 UPDATE 1
--- транзакция теперь удерживает блокировку таблицы, собственный номер транзакции 743
+-- transaction now holds a lock on the table, own number transaction 743
 otus=*# SELECT * FROM locks_v WHERE pid = 16633;
   pid  |   locktype    |  lockid  |       mode       | granted 
 -------+---------------+----------+------------------+---------
@@ -92,9 +91,9 @@ otus=*# SELECT txid_current(), pg_backend_pid();
 --------------+----------------
           744 |          16772
 (1 row)
--- на этом шаге транзакция зависает в очереди ожидания
+-- at this point, the transaction is waiting in the queue
 otus=*# UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
--- транзакция заблокировала таблицу accounts, собственный номер транзакции 744, блокировку типа tuple (версии строки), пытается захватить блокировку транзакции 743 - false
+-- the transaction has locked the accounts table, its own transaction id is 744, it tries to acquire the lock of transaction 743 - false
 otus=# SELECT * FROM locks_v WHERE pid = 16772;
   pid  |   locktype    |   lockid   |       mode       | granted 
 -------+---------------+------------+------------------+---------
@@ -104,7 +103,7 @@ otus=# SELECT * FROM locks_v WHERE pid = 16772;
  16772 | tuple         | accounts:7 | ExclusiveLock    | t
 (4 rows)
 
--- после коммита транзакции 1, просыпаемся. Теперь держим блокировку отношения и собственного номера транзакции 744
+-- after the commit of transaction 1, we wake up. Now we hold the relation and our own transaction lock 744
 
 otus=*# SELECT * FROM locks_v WHERE pid = 16772;
   pid  |   locktype    |  lockid  |       mode       | granted 
@@ -126,9 +125,9 @@ otus=*# SELECT txid_current(), pg_backend_pid();
 --------------+----------------
           745 |          17180
 (1 row)
--- на этом шаге транзакция также зависает в очереди ожидания
+-- at this point, the transaction is also waiting in the queue
 otus=*# UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 1;
--- транзакция заблокировала таблицу accounts, собственный номер транзакции 745, пытается захватить блокировку типа tuple (версии строки) - false
+-- the transaction has locked the accounts table, its own transaction id is 745, it tries to acquire the tuple lock - false
 otus=*# SELECT * FROM locks_v WHERE pid = 17180;
   pid  |   locktype    |   lockid   |       mode       | granted 
 -------+---------------+------------+------------------+---------
@@ -137,7 +136,7 @@ otus=*# SELECT * FROM locks_v WHERE pid = 17180;
  17180 | tuple         | accounts:7 | ExclusiveLock    | f
 (3 rows)
 
--- после коммита транзакции 1. Теперь держим блокировку отношения и собственного номера транзакции 745 и пытаемся захватить id транзакции 744 - false
+-- after the commit of transaction 1. Now we hold the relation and our own transaction lock 745 and try to acquire transaction id 744 - false
 
 otus=*# SELECT * FROM locks_v WHERE pid = 17180;
   pid  |   locktype    |  lockid  |       mode       | granted 
@@ -147,7 +146,7 @@ otus=*# SELECT * FROM locks_v WHERE pid = 17180;
  17180 | transactionid | 744      | ShareLock        | f
 (3 rows)
 
--- после коммита транзакции 2 просыпаемся. Теперь держим блокировку отношения и собственного номера транзакции 745.
+-- after the commit of transaction 2 we wake up. Now we hold the relation and our own transaction lock 745.
 
 otus=# SELECT * FROM locks_v WHERE pid = 17180;
   pid  |   locktype    |  lockid  |       mode       | granted 
@@ -160,11 +159,11 @@ otus=*# COMMIT;
 COMMIT
 
 ```
-4. Воспроизведите взаимоблокировку трех транзакций. Можно ли разобраться в ситуации постфактум, изучая журнал сообщений?
+4. Reproduce a deadlock situation with three transactions. Can you understand the situation post-factum by studying the log messages?  
 ```
--- Транзакция 1 (сессия 1)  держит блокирует строку acc_no = 1. Обновляет строку acc_no = 2
--- Транзакция 2 (сессия 2)  держит блокирует строку acc_no = 2. Обновляет строку acc_no = 3
--- Транзакция 3 (сессия 3)  держит блокирует строку acc_no = 3. Обновляет строку acc_no = 1
+-- Transaction 1 (session 1) holds and locks row acc_no = 1. Updates row acc_no = 2.
+-- Transaction 2 (session 2) holds and locks row acc_no = 2. Updates row acc_no = 3.
+-- Transaction 3 (session 3) holds and locks row acc_no = 3. Updates row acc_no = 1.
 
 otus=*# select * from accounts;                                                                                                                                                               
  acc_no | amount                                                                                                                                                                              
@@ -190,7 +189,7 @@ otus=*# SELECT amount FROM accounts WHERE acc_no = 1 FOR UPDATE;
  1000.00
 (1 row)
 
--- висим
+-- busy
 otus=*# UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 2;
 
 ```
@@ -210,7 +209,7 @@ otus=*# SELECT amount FROM accounts WHERE acc_no = 2 FOR UPDATE;
  2000.00
 (1 row)
 
--- висим
+-- busy
 otus=*# otus=*# UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 3;
 
 ```
@@ -241,11 +240,11 @@ CONTEXT:  while updating tuple (0,1) in relation "accounts"
 ```
 
 ```
-В логах видим - deadlock detected
-Детализация показывает:
-1. Процесс 17180 хочет ShareLock на тразакции 752, которым владеет процесс 16633
-2. Процесс 16633 хочет ShareLock на тразакции 753, которым владеет процесс 16772
-3. Процесс 16772 хочет ShareLock на тразакции 754, которым владеет процесс 17180
+In logs - deadlock detected
+Detalization:
+1. Process 17180 wants a ShareLock on transaction 752, which is held by process 16633.
+2. Process 16633 wants a ShareLock on transaction 753, which is held by process 16772.
+3. Process 16772 wants a ShareLock on transaction 754, which is held by process 17180.
 ```
 
 ```
@@ -269,9 +268,9 @@ CONTEXT:  while updating tuple (0,1) in relation "accounts"
 2024-01-22 22:16:19.921 UTC [16772] postgres@otus STATEMENT:  UPDATE accounts SET amount = amount + 100.00 WHERE acc_no = 3;
 ```
 
-5. Могут ли две транзакции, выполняющие единственную команду UPDATE одной и той же таблицы (без where), заблокировать друг друга?
+5. Can two transactions executing a single UPDATE command on the same table (without where) block each other?  
 ```
-Две транзации могут взаимоблокироваться: 
-- Транзакция #1 обновляет строки в одном порядке (по возрастанияю);
-- Транзакция #2 обновляет строки в другом порядке (по убыванию).
+Two transactions can deadlock each other:  
+- Transaction #1 updates rows in one order (ascending).  
+- Transaction #2 updates rows in a different order (descending).  
 ```

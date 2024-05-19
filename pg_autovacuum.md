@@ -1,11 +1,10 @@
-# Домашнее задание
-## Настройка autovacuum с учетом особеностей производительности
+## Setting up autovacuum considering performance features
 
-1. Cоздать инстанс ВМ с 2 ядрами и 4 Гб ОЗУ и SSD 10GB
+1. Create a VM instance with 2 cores, 4 GB RAM, and 10GB SSD
 ```
 Создан ec2 инстанс в aws
 ```
-2. Установить на него PostgreSQL 15 с дефолтными настройками
+2. Install PostgreSQL 15 with default settings
 ```
 sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - && sudo apt-get update && sudo apt -y install postgresql-15
 ```
@@ -13,7 +12,7 @@ sudo apt update && sudo apt upgrade -y -q && sudo sh -c 'echo "deb http://apt.po
 ubuntu@ip-172-31-35-134:~$ sudo -u postgres pg_lsclusters
 Ver Cluster Port Status Owner    Data directory              Log file
 ```
-3. Создать БД для тестов: выполнить pgbench -i postgres
+3. Create a test database: execute `pgbench -i postgres`
 ```
 root@ip-172-31-35-134:/home/ubuntu# su postgres
 postgres@ip-172-31-35-134:/home/ubuntu$ pgbench -i postgres
@@ -29,7 +28,7 @@ vacuuming...
 creating primary keys...
 done in 0.53 s (drop tables 0.00 s, create tables 0.01 s, client-side generate 0.14 s, vacuum 0.04 s, primary keys 0.34 s).
 ```
-4. Запустить pgbench -c8 -P 6 -T 60 -U postgres postgres
+4. Run `pgbench -c8 -P 6 -T 60 -U postgres postgres`
 
 ```
 postgres@ip-172-31-44-224:/home/ubuntu$ pgbench -c 8 -P 6 -T 60 -U postgres postgres
@@ -60,7 +59,7 @@ initial connection time = 21.620 ms
 tps = 758.422316 (without initial connection time)
 ```
 
-5. Применить параметры настройки PostgreSQL из прикрепленного к материалам занятия файла
+5. Apply PostgreSQL configuration parameters from the attached class file
 ```
 done
 ```
@@ -80,7 +79,7 @@ min_wal_size = 4GB
 max_wal_size = 16GB
 ```
 
-6. Протестировать заново
+6. Test again
 ```
 postgres@ip-172-31-43-191:/home/ubuntu$ pgbench -c 8 -P 6 -T 60 -U postgres postgres
 pgbench (15.5 (Ubuntu 15.5-1.pgdg22.04+1))
@@ -109,25 +108,25 @@ latency stddev = 6.699 ms
 initial connection time = 50.669 ms
 tps = 758.663805 (without initial connection time)
 ```
-7. Что изменилось и почему?
 
-Применение настроек на используемой машине не привело к каким либо существенным изменениям.
-Исключение составляет initial connection time, который изменился с 21.620 ms (до) на 50.669 ms (после). 
-Связываю это с рестартом кластера, т.к. повторный прогон pgbench выдал схожее с 21.620 ms значение.
+7. What has changed and why?
 
-Однако, если произвести вычисление суммарно потребляемой памяти кластером, становится понятно, что память превышает имеющиеся на машине 4 GB RAM.
+Applying the settings on the machine being used did not result in any significant changes. 
+The exception is the initial connection time, which changed from 21.620 ms (before) to 50.669 ms (after), which I attribute to cluster restart since subsequent pgbench runs returned a value close to 21.620 ms.
 
-Память, выделенная для единицы backend process, составляет:
-work_mem + maintenance_work_mem + temp_buffers = 6MB + 512MB + 8MB = 526 MB на процесс.
-Клиентов 8, соответственно 526 * 8 = 4.026 GB
+However, if you calculate the total memory consumption by the cluster, it becomes clear that the memory exceeds the available 4 GB RAM on the machine.
 
-На shared_buffers выделяем 1GB
+Memory allocated to one backend process unit is:
+`work_mem + maintenance_work_mem + temp_buffers = 6MB + 512MB + 8MB = 526 MB per process.`
+With 8 clients, this totals to `526 * 8 = 4.026 GB`.
 
-Таким образом приблизительный расчет дает 5 GB памяти, которую кластер будет потреблять при подключении 8 клиентов. 
-Механизм swapping, существующий в ОС, безусловно решает проблему нехватки виртуальной памяти, однако возможное повышение latency остается незамеченным в рамках
-прогона утилиты pgbench
+Additionally, 1GB is allocated to `shared_buffers`.
 
-8. Создать таблицу с текстовым полем и заполнить случайными или сгенерированными данным в размере 1млн строк
+Therefore, a rough calculation indicates that the cluster will consume approximately 5 GB of memory with 8 clients connected. The swapping mechanism in the OS certainly addresses the issue of virtual memory shortage, but potential latency increase remains unnoticed within the framework
+The completion of the pgbench utility run.
+
+8. Create a table with a text field and populate it with randomly or generated data with 1 million rows.
+
 ```
 otus=# CREATE TABLE t1(data text);
 CREATE TABLE
@@ -136,7 +135,7 @@ otus=# INSERT INTO t1 (data)
 SELECT substr(md5(random()::text), 1, 10) FROM generate_series(1, 1000000);
 INSERT 0 1000000
 ```
-9. Посмотреть размер файла с таблицей
+9. Check the size of the table file
 ```
 otus=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
  pg_size_pretty 
@@ -144,7 +143,7 @@ otus=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
  42 MB
 (1 row)
 ```
-10. 5 раз обновить все строчки и добавить к каждой строчке любой символ
+10. Update all rows 5 times and add any character to each row.
 ```
 otus=# UPDATE t1 SET data=CONCAT(data, 'a');
 UPDATE t1 SET data=CONCAT(data, 'b');
@@ -157,7 +156,7 @@ UPDATE 1000000
 UPDATE 1000000
 UPDATE 1000000 
 ```
-11. Посмотреть количество мертвых строчек в таблице и когда последний раз приходил автовакуум
+11. Check the number of dead rows in the table and when autovacuum last ran
 ```
 otus=# SELECT relname, n_live_tup, n_dead_tup, last_autovacuum 
 FROM pg_stat_user_tables 
@@ -172,7 +171,7 @@ otus=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
  253 MB
 (1 row)
 ```
-12. Подождать некоторое время, проверяя, пришел ли автовакуум
+12. Wait for some time, checking if autovacuum has come
 ```
 otus=# SELECT relname, n_live_tup, n_dead_tup, last_autovacuum 
 FROM pg_stat_user_tables 
@@ -188,7 +187,7 @@ otus=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
  253 MB
 (1 row)
 ```
-13. 5 раз обновить все строчки и добавить к каждой строчке любой символ
+13. Update all rows 5 times and add any symbol to each row
 ```
 otus=# UPDATE t1 SET data=CONCAT(data, 'a');
 UPDATE t1 SET data=CONCAT(data, 'b');
@@ -201,7 +200,7 @@ UPDATE 1000000
 UPDATE 1000000
 UPDATE 1000000 
 ```
-14. Посмотреть размер файла с таблицей
+14. Check the size of the table
 ```
 otus=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
  pg_size_pretty 
@@ -209,12 +208,12 @@ otus=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
  253 MB
 (1 row)
 ```
-15. Отключить Автовакуум на конкретной таблице
+15. Disable autovacuum on the specific table
 ```
 otus=# ALTER TABLE t1 SET (autovacuum_enabled = false);
 ALTER TABLE
 ```
-16. 10 раз обновить все строчки и добавить к каждой строчке любой символ
+16. Update all rows 10 times and add any symbol to each row
 ```
 UPDATE t1 SET data=CONCAT(data, '1');
 UPDATE t1 SET data=CONCAT(data, '2');
@@ -227,7 +226,7 @@ UPDATE t1 SET data=CONCAT(data, '8');
 UPDATE t1 SET data=CONCAT(data, '9');
 UPDATE t1 SET data=CONCAT(data, '10');
 ```
-17. Посмотреть размер файла с таблицей
+17. Check the size of the table
 ```
 test_vacuum=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
  pg_size_pretty 
@@ -236,17 +235,16 @@ test_vacuum=# SELECT pg_size_pretty(pg_TABLE_size('t1'));
 (1 row)
 ```
 
-18. Объясните полученный результат
+18. Explain the result obtained
 ```
-Использование в PG механизма многоверсионности (tuple multi versioning) приводит к тому, что
-операция UPDATE оставляет текущую версию строки (dead) и создает новую версию с обновленными данными.
+The use of PostgreSQL's tuple multi versioning mechanism leads to the behavior where an UPDATE operation keeps the current version of the row (dead) and creates a new version with the updated data.
 
-1е обновление строк 5 раз подряд - 1_000_000 актуальных строк и ~ 5_000_000 мертвых строк.
-Вызов AUTOVACUUM удаляет мертвые строки, однако не освобождает память, размер таблицы как до так и после AUTOVACUUM составляет 253 MB. 
+1st update of rows 5 times in a row - 1,000,000 live rows and ~5,000,000 dead rows.
+Running AUTOVACUUM removes the dead rows but does not free up space; hence, the table size remains 253 MB both before and after AUTOVACUUM.
 
-2е обновление строк 5 раз подряд - размер таблицы не изменяется и составляет 253 MB, это объясняется тем, что
-PG переиспользует место, занимаемое освобожденными в результате AUTOVACUUM, строками.
+2nd update of rows 5 times in a row - the table size remains unchanged at 253 MB, as PostgreSQL reuses the space occupied by the dead rows freed up by AUTOVACUUM.
 
-3е обновление строк 10 раз подряд (при отключенном AUTOVACUUM) - мертвые строки не очищаются, вставка новых версий строк, при обновлении данных, приводит к росту размера таблицы до 601 MB.
+3rd update of rows 10 times in a row (with autovacuum disabled) - dead rows are not cleaned up, and inserting new versions of rows as data is updated causes the table size to grow to 601 MB.
+
 
 ```

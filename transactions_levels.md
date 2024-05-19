@@ -1,25 +1,25 @@
-# Домашнее задание
-## Работа с уровнями изоляции транзакции в PostgreSQL
+## Working with transaction isolation levels PostgreSQL
 
-Подготовительные работы
+
+Preparations  
 ```sql
--- создаем новую БД
+-- create a new database
 CREATE DATABASE otus;
 
--- подключаемся
+-- connect to it
 \c otus
 
--- создаем и наполняем таблицу persons
+-- create and populate the persons table
 create table persons(id serial, first_name text, second_name text); 
 insert into persons(first_name, second_name) values('ivan', 'ivanov'); 
 insert into persons(first_name, second_name) values('petr', 'petrov'); 
 
--- отключаем автокоммит
+-- disable autocommit
 \set AUTOCOMMIT OFF
 
 ```
 
-Проверяем что данные на месте:
+Check that the data is in place  
 ```sql
 otus=# select * from persons;
  id | first_name | second_name 
@@ -29,7 +29,7 @@ otus=# select * from persons;
 (2 rows)
 
 ```
-Проверяем, что глобальный уровень изоляции транзакций **read committed**:
+Check that the global transaction isolation level is **read committed**  
 ```sql
 otus=*# show transaction isolation level;
 transaction_isolation 
@@ -55,9 +55,8 @@ select * from persons;
 (2 rows)
 
 ```
-
-- **ВОПРОС**: видите ли вы новую запись и если да то почему?
-- **ОТВЕТ**: Новая запись отсутствует, т.к. в рамках T1 не был произведен commit
+-- **Question**: Do you see the new record and if yes, why?
+-- **Answer**: The new record is absent because T1 has not committed yet.
 
 #Т1
 ```sql
@@ -80,8 +79,8 @@ select * from persons
 commit;
 ```
 
-- **ВОПРОС**: видите ли вы новую запись и если да то почему?
-- **ОТВЕТ**: Новая запись есть, т.к. в рамках T1 был произведен commit
+- **Question**: Do you see the new record and if yes, why?
+- **Answer**: The new record is present because T1 has committed.
 
 ```sql
 begin;
@@ -108,8 +107,8 @@ select * from persons;
 (3 rows)
 ```
 
-- **ВОПРОС**: видите ли вы новую запись и если да то почему?
-- **ОТВЕТ**: нет, мы видим состояние таблицы на момент начала T2
+- **Question**: Do you see the new record and if yes, why?
+- **Answer**: No, we see the state of the table at the beginning of T2.
 
 #T1
 ```sql
@@ -128,8 +127,8 @@ select * from persons;
 (3 rows)
 ```
 
-- **ВОПРОС**: видите ли вы новую запись и если да то почему?
-- **ОТВЕТ**: нет, мы видим состояние таблицы на момент начала T2
+- **Question**: Do you see the new record and if yes, why?
+- **Answer**: No, we see the state of the table at the beginning of T2.
 
 #T2
 ```sql
@@ -150,5 +149,5 @@ select * from persons;
 (4 rows)
 ```
 
-- **ВОПРОС**: видите ли вы новую запись и если да то почему?
-- **ОТВЕТ**: начинаем новую транзацию на чтение, получаем актуальные изменения с добавленным person sveta, т.к. T1 завершилась с COMMIT
+- **Question**: Do you see the new record and if yes, why?
+- **Answer**: Starting a new transaction for reading, we get the current changes with the added person 'sveta' since T1 has committed.

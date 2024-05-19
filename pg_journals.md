@@ -1,12 +1,11 @@
-# Домашнее задание
-## Работа с журналами
+## Working with Journals  
 
-1. Настройте выполнение контрольной точки раз в 30 секунд.
+1. Set up a checkpoint to be executed every 30 seconds.  
 ```
 postgres=# alter system set checkpoint_timeout = '30s';
 ALTER SYSTEM
 ```
-2. 10 минут c помощью утилиты pgbench подавайте нагрузку
+2. Provide a workload for 10 minutes using the pgbench utility.  
 ```
 postgres@ip-172-31-34-121:/home/ubuntu$ pgbench -i postgres
 dropping old tables...
@@ -44,7 +43,7 @@ latency stddev = 6.021 ms
 initial connection time = 27.227 ms
 tps = 813.669920 (without initial connection time)
 ```
-3. Измерьте, какой объем журнальных файлов был сгенерирован за это время. 
+3. Measure the volume of WAL files generated during this time.  
 ```
 -- https://gist.github.com/lesovsky/4587d70f169739c01d4525027c087d14
 
@@ -54,22 +53,24 @@ tps = 813.669920 (without initial connection time)
 (1 row)
 
 ```
-4. Оцените, какой объем приходится в среднем на одну контрольную точку.
+4. Evaluate the average amount per checkpoint.  
 ```
 15.45 MB per checkpoint
 ```
-5. Проверьте данные статистики: все ли контрольные точки выполнялись точно по расписанию. Почему так произошло?
-```
-Заданный интервал между точками составил 30 секунд.
-Расчетный составил 33 секунды, а время записи составляет  checkpoint_completion_target x 30 = 0.9 * 30 = 27 секунд.
-Запись контрольной точки завершается за 6 секунд до начала следующей точки. Несмотря на то, что в момент времени выполняется одна контрольная точка,
-запас в 6 секунд является ненадежным решением. 
-Стоит отметить, что дальнейшее увеличение нагрузки, особенно при уменьшении параметра max_wal_size, может приводить к незапланированному вызову 
-контрольной точки сервером, т.к. будет превышен допустимый объем журнальных записей. Внеплановый вызов точки при запасе всего 6 секунд 
-приведет к тому, что точки на шкале времени будут расположены "внахлест" .
+5. Check the statistics: did all checkpoints execute exactly on schedule? Why did this happen?  
 ```
 
-6. Сравните tps в синхронном/асинхронном режиме утилитой pgbench
+The specified interval between checkpoints was 30 seconds.
+
+The calculated interval was 33 seconds, and the write time is checkpoint_completion_target x 30 = 0.9 * 30 = 27 seconds.
+
+The checkpoint is written 6 seconds before the next checkpoint starts. Despite the fact that one checkpoint is running at a time, a 6-second buffer is not a reliable solution.
+
+It is worth noting that further increasing the load, especially when decreasing the max_wal_size parameter, can lead to an unplanned checkpoint call by the server, since the allowed volume of log records will be exceeded. An unplanned checkpoint call with a margin of only 6 seconds will result in the checkpoints being "overlapped" on the timeline.
+
+```
+
+6. Compare tps in synchronous/asynchronous mode using the pgbench utility  
 ```
 --- async
 latency average = 0.616 ms
@@ -82,15 +83,14 @@ initial connection time = 3.536 ms
 tps = 579.269171 (without initial connection time)
 
 ```
-7. Объясните полученный результат.
+7. Explain your result.  
 ```
-При асинхронной фиксации время отклика (latency) уменьшилось (0.616 ms против 1.726 ms)
-Пропускная способность (tps) увеличилась (1624.5 против 579.2)
+In asynchronous commit, response time (latency) decreased (0.616 ms compared to 1.726 ms).
+Throughput (tps) increased (1624.5 compared to 579.2).
 
-При синхронной записи команда COMMIT не возвращает управление до конца синхронизации, тем самым увеличивая время отклика 
-и снижая пропускную tps системы. При асинхронной записи фиксация изменений не ждет физической записи на диск. 
+In synchronous write, the COMMIT command does not return control until the synchronization is complete, thus increasing response time and decreasing system throughput tps. With asynchronous write, changes are committed without waiting for physical disk write.
 ```
-8. Создайте новый кластер с включенной контрольной суммой страниц.
+8. Create a new cluster with page checksum enabled.  
 ```
 ubuntu@ip-172-31-34-233:~$ sudo /usr/lib/postgresql/15/bin/pg_checksums -D /var/lib/postgresql/15/main/ -e
 Checksum operation completed
@@ -102,7 +102,7 @@ otus=# show data_checksums;
  on
 (1 row)
 ```
-9. Создайте таблицу. Вставьте несколько значений. 
+9. Create a table. Insert multiple values.  
 ```
 postgres=# CREATE DATABASE otus;
 CREATE DATABASE
@@ -115,15 +115,15 @@ CREATE TABLE
 INSERT 0 1
 INSERT 0 1
 ```
-10. Выключите кластер.
+10. Shut down the cluster.  
 ```
 ubuntu@ip-172-31-34-233:~$ sudo systemctl stop postgresql@15-main
 ```
-11. Измените пару байт в таблице. 
+11. Change a couple of bytes in the table.  
 ```
 ubuntu@ip-172-31-34-233:~$ sudo sed -i 's/@/@12345@/' /var/lib/postgresql/15/main/base/16388/16390
 ```
-12. Включите кластер и сделайте выборку из таблицы. 
+12. Turn on the cluster and make a selection from the table.  
 ```
 ubuntu@ip-172-31-34-233:~$ sudo systemctl start postgresql@15-main
 ```
@@ -132,14 +132,13 @@ otus=# select * from persons;
 WARNING:  page verification failed, calculated checksum 37049 but expected 3345
 ERROR:  invalid page in block 0 of relation base/16388/16390
 ```
-13. Что и почему произошло?
+13. What happened and why?  
 ```
-Механизм контрольный сумм включен, таким образом это защищает основной слой файлов данных. 
-В нашем случае несовпадение значений [контрольных сумм] привело к указанной выше ошибке.
+Checksum mechanism is enabled, thus protecting the primary layer of data files.
+In our case, the mismatch of checksum values led to the error mentioned above.
 ```
-14. как проигнорировать ошибку и продолжить работу?
+14. How to ignore the error and continue working?  
 ```
-Предлагаю следующие варианты решения:
-1. Можно попробовать восстановить данные из резервной копии (если имеется);
-2. Попробовать прочитать поврежденную страницу (с риском получить искаженную информацию) используя ignore_checksum_failure off.
+1. Try to restore data from a backup copy (if available);
+2. Try to read the corrupted page (with the risk of obtaining distorted information) using ignore_checksum_failure off.
 ```
